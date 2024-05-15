@@ -21,11 +21,6 @@ app.use(express.static("public"));
 
 let currentUserId = 1;
 
-/*let users = [
-  { id: 1, name: "Angela", color: "teal" },
-  { id: 2, name: "Jack", color: "powderblue" },
-];*/
-
 async function checkVisisted() {
   const result = await db.query("SELECT country_code FROM visited_countries_family WHERE user_id=($1)", [currentUserId]); 
   let countries = [];
@@ -74,20 +69,31 @@ app.post("/add", async (req, res) => {
 
     const data = result.rows[0];
     const countryCode = data.country_code;
-    try {  // here set properly the user id 
-      await db.query(
-        "INSERT INTO visited_countries_family (country_code, user_id) VALUES ($1, $2)",
-        [countryCode, currentUserId]
-      );
-      res.redirect("/");
-    } catch (err) {
-      console.log(err);
+
+    const visitedCountries = await db.query("SELECT country_code FROM visited_countries_family WHERE user_id=($1) AND country_code=($2)", [currentUserId, countryCode]);
+    const visitedCountryCode = visitedCountries.rows[0]
+
+    if (!visitedCountryCode) {
+      try {  
+        await db.query(
+          "INSERT INTO visited_countries_family (country_code, user_id) VALUES ($1, $2)",
+          [countryCode, currentUserId]
+        );
+        res.redirect("/");
+      } catch (err) {
+        console.log(err);
+      }
     }
+    else if (visitedCountryCode.country_code === countryCode){
+      console.log("The country has already been added");
+      res.redirect("/");
+    } 
   } catch (err) {
     console.log(err);
+    res.redirect("/");
   }
 });
-//set the current user 
+
 app.post("/user", async (req, res) => {
   let result = req.body
   if (result.add == "new") {
@@ -104,8 +110,7 @@ app.post("/new", async (req, res) => {
   console.log(req.body);
   await db.query("INSERT INTO users (name, color) VALUES ($1, $2)", [req.body.name, req.body.color]);
   res.redirect("/");
-  //Hint: The RETURNING keyword can return the data that was inserted.
-  //https://www.postgresql.org/docs/current/dml-returning.html
+  
 });
 
 app.listen(port, () => {
